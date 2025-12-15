@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRE GPT - Application Monitoring Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script>
+        // Debug Socket.IO loading
+        console.log('Socket.IO script loaded, io available:', typeof io !== 'undefined');
+        
+        // Add error handling for fetch requests
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+        
+        // Log all network requests
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            console.log('Fetch request:', args[0]);
+            return originalFetch.apply(this, args)
+                .then(response => {
+                    console.log('Fetch response:', response.status, response.statusText);
+                    return response;
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    throw error;
+                });
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Initialize dark mode before page renders to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('sre-gpt-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <style>
+        /* Base styles */
+        .status-healthy { 
+            background-color: #dcfce7; 
+            color: #166534; 
+            border-color: #bbf7d0; 
+        }
+        .status-warning { 
+            background-color: #fef3c7; 
+            color: #92400e; 
+            border-color: #fde68a; 
+        }
+        .status-critical { 
+            background-color: #fee2e2; 
+            color: #991b1b; 
+            border-color: #fecaca; 
+        }
+        .status-unknown { 
+            background-color: #f3f4f6; 
+            color: #1f2937; 
+            border-color: #e5e7eb; 
+        }
+        
+        .chat-message { 
+            margin-bottom: 1rem; 
+            padding: 0.75rem; 
+            border-radius: 0.5rem; 
+        }
+        .chat-user { 
+            background-color: #dbeafe; 
+            color: #1e3a8a; 
+            margin-left: 2rem; 
+        }
+        .chat-bot { 
+            background-color: #f3f4f6; 
+            color: #1f2937; 
+            margin-right: 2rem; 
+        }
+        
+        .metric-card { 
+            background-color: white; 
+            border-radius: 0.5rem; 
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); 
+            padding: 1.5rem; 
+            border: 1px solid #e5e7eb; 
+        }
+        
+        .status-indicator { 
+            display: inline-flex; 
+            align-items: center; 
+            padding: 0.125rem 0.625rem; 
+            border-radius: 9999px; 
+            font-size: 0.75rem; 
+            font-weight: 500; 
+            border: 1px solid; 
+        }
+        
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+            background-color: #f3f4f6;
+            color: #4b5563;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .theme-toggle:hover {
+            background-color: #e5e7eb;
+        }
+        
+        /* Smooth transitions */
+        * {
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+        
+        /* Performance metrics cards */
+        .performance-card {
+            background: linear-gradient(to right, #3b82f6, #8b5cf6);
+            color: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Pulse animation for critical alerts */
+        .pulse-critical {
+            animation: pulse-red 2s infinite;
+        }
+        
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* Glow effect for healthy status */
+        .glow-healthy {
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+        }
+
+        /* DARK MODE STYLES */
+        .dark {
+            color-scheme: dark;
+        }
+        
+        .dark body {
+            background-color: #111827 !important;
+            color: #f9fafb !important;
+        }
+        
+        .dark header {
+            background-color: #1f2937 !important;
+        }
+        
+        .dark .metric-card {
+            background-color: #1f2937 !important;
+            border-color: #374151 !important;
+            color: #f9fafb !important;
+        }
+        
+        .dark .status-healthy { 
+            background-color: #064e3b !important; 
+            color: #a7f3d0 !important; 
+            border-color: #047857 !important; 
+        }
+        .dark .status-warning { 
+            background-color: #78350f !important; 
+            color: #fde68a !important; 
+            border-color: #b45309 !important; 
+        }
+        .dark .status-critical { 
+            background-color: #7f1d1d !important; 
+            color: #fca5a5 !important; 
+            border-color: #b91c1c !important; 
+        }
+        .dark .status-unknown { 
+            background-color: #374151 !important; 
+            color: #d1d5db !important; 
+            border-color: #4b5563 !important; 
+        }
+        
+        .dark .chat-user { 
+            background-color: #1e3a8a !important; 
+            color: #dbeafe !important; 
+        }
+        .dark .chat-bot { 
+            background-color: #374151 !important; 
+            color: #f3f4f6 !important; 
+        }
+        
+        .dark .theme-toggle {
+            background-color: #374151 !important;
+            color: #d1d5db !important;
+        }
+        
+        .dark .theme-toggle:hover {
+            background-color: #4b5563 !important;
+        }
+        
+        .dark .performance-card {
+            background: linear-gradient(to right, #2563eb, #7c3aed) !important;
+        }
+        
+        .dark .glow-healthy {
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.4) !important;
+        }
+        
+        .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+            color: #f9fafb !important;
+        }
+        
+        .dark p, .dark span {
+            color: #d1d5db !important;
+        }
+        
+        .dark .text-gray-500 {
+            color: #9ca3af !important;
+        }
+        
+        .dark .text-gray-600 {
+            color: #d1d5db !important;
+        }
+        
+        .dark .text-gray-700 {
+            color: #d1d5db !important;
+        }
+        
+        .dark .text-gray-900 {
+            color: #f9fafb !important;
+        }
+        
+        .dark input {
+            background-color: #374151 !important;
+            border-color: #4b5563 !important;
+            color: #f9fafb !important;
+        }
+        
+        .dark button.quick-action {
+            opacity: 0.9;
+        }
+        
+        .dark #chat-messages {
+            background-color: #374151 !important;
+        }
+        
+        /* Dark mode scrollbar */
+        .dark ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .dark ::-webkit-scrollbar-track {
+            background-color: #1f2937;
+        }
+        
+        .dark ::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 4px;
+        }
+        
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background-color: #6b7280;
+        }
+        
+        /* Recent Events Dark Mode Fix */
+        .dark .border-red-500 {
+            border-color: #ef4444 !important;
+        }
+        
+        .dark .border-yellow-500 {
+            border-color: #eab308 !important;
+        }
+        
+        .dark .border-blue-500 {
+            border-color: #3b82f6 !important;
+        }
+        
+        .dark .border-gray-300 {
+            border-color: #6b7280 !important;
+        }
+        
+        .dark .text-red-600 {
+            color: #f87171 !important;
+        }
+        
+        .dark .text-yellow-600 {
+            color: #facc15 !important;
+        }
+        
+        .dark .text-green-600 {
+            color: #4ade80 !important;
+        }
+        
+        /* Event cards background in dark mode */
+        .dark #recent-events > div {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+        }
+        
+        .dark #recent-events h4 {
+            color: #f9fafb !important;
+        }
+        
+        .dark #recent-events p {
+            color: #d1d5db !important;
+        }
+        
+        .dark #recent-events span {
+            color: #9ca3af !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-6">
+                    <div class="flex items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                <span class="text-white font-bold text-lg">🤖</span>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">SRE GPT</h1>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">AI-Powered Monitoring</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div id="connection-status" class="status-indicator status-unknown">
+                            <span class="w-2 h-2 bg-current rounded-full mr-1"></span>
+                            Connecting...
+                        </div>
+                        <button id="theme-toggle" class="theme-toggle" title="Toggle dark mode">
+                            <span id="theme-icon">🌙</span>
+                        </button>
+                        <button id="refresh-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors duration-200">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Performance Overview Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="performance-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm">Response Time</p>
+                            <p id="avg-response-time" class="text-2xl font-bold">--ms</p>
+                        </div>
+                        <div class="text-3xl">⚡</div>
+                    </div>
+                </div>
+                <div class="performance-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm">Error Rate</p>
+                            <p id="error-rate" class="text-2xl font-bold">--%</p>
+                        </div>
+                        <div class="text-3xl">🚨</div>
+                    </div>
+                </div>
+                <div class="performance-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm">Active Services</p>
+                            <p id="active-services" class="text-2xl font-bold">--</p>
+                        </div>
+                        <div class="text-3xl">🔧</div>
+                    </div>
+                </div>
+                <div class="performance-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm">Uptime</p>
+                            <p id="system-uptime" class="text-2xl font-bold">99.9%</p>
+                        </div>
+                        <div class="text-3xl">📈</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Main Dashboard -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Overall Health Status -->
+                    <div class="metric-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">System Health Overview</h2>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs text-gray-500 dark:text-gray-400">Last updated:</span>
+                                <span id="last-updated" class="text-xs text-gray-600 dark:text-gray-300">--</span>
+                            </div>
+                        </div>
+                        <div id="overall-health" class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg font-medium text-gray-900 dark:text-white">Overall Status</span>
+                                <span id="overall-status" class="status-indicator status-unknown">Loading...</span>
+                            </div>
+                            <p id="health-summary" class="text-gray-600 dark:text-gray-300">Fetching system status...</p>
+                        </div>
+                    </div>
+
+                    <!-- Component Status Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="metric-card hover:shadow-lg transition-shadow duration-200">
+                            <div class="flex items-center mb-3">
+                                <span class="text-2xl mr-2">🔧</span>
+                                <h3 class="font-semibold text-gray-900 dark:text-white">Services</h3>
+                            </div>
+                            <div id="services-status" class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-700 dark:text-gray-300">Status:</span>
+                                    <span class="status-indicator status-unknown">Loading...</span>
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Analyzing services...</p>
+                            </div>
+                        </div>
+
+                        <div class="metric-card hover:shadow-lg transition-shadow duration-200">
+                            <div class="flex items-center mb-3">
+                                <span class="text-2xl mr-2">🖥️</span>
+                                <h3 class="font-semibold text-gray-900 dark:text-white">Infrastructure</h3>
+                            </div>
+                            <div id="infrastructure-status" class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-700 dark:text-gray-300">Status:</span>
+                                    <span class="status-indicator status-unknown">Loading...</span>
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Checking infrastructure...</p>
+                            </div>
+                        </div>
+
+                        <div class="metric-card hover:shadow-lg transition-shadow duration-200">
+                            <div class="flex items-center mb-3">
+                                <span class="text-2xl mr-2">🗄️</span>
+                                <h3 class="font-semibold text-gray-900 dark:text-white">Databases</h3>
+                            </div>
+                            <div id="databases-status" class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-700 dark:text-gray-300">Status:</span>
+                                    <span class="status-indicator status-unknown">Loading...</span>
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Monitoring databases...</p>
+                            </div>
+                        </div>
+
+                        <div class="metric-card hover:shadow-lg transition-shadow duration-200">
+                            <div class="flex items-center mb-3">
+                                <span class="text-2xl mr-2">☸️</span>
+                                <h3 class="font-semibold text-gray-900 dark:text-white">Kubernetes</h3>
+                            </div>
+                            <div id="kubernetes-status" class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-700 dark:text-gray-300">Status:</span>
+                                    <span class="status-indicator status-unknown">Loading...</span>
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Checking clusters...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Problems -->
+                    <div class="metric-card">
+                        <div class="flex items-center mb-4">
+                            <span class="text-2xl mr-2">🚨</span>
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Active Problems</h2>
+                        </div>
+                        <div id="problems-list" class="space-y-3">
+                            <p class="text-gray-600 dark:text-gray-400">Loading problems...</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Events -->
+                    <div class="metric-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="text-2xl mr-2">📊</span>
+                                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Recent Events</h2>
+                            </div>
+                            <button id="clear-events" class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                Clear
+                            </button>
+                        </div>
+                        <div id="recent-events" class="space-y-2">
+                            <p class="text-gray-600 dark:text-gray-400">Loading recent events...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Interface -->
+                <div class="lg:col-span-1">
+                    <div class="metric-card h-full flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="text-2xl mr-2">🤖</span>
+                                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">SRE GPT Chat</h2>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div id="chat-status" class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span class="text-xs text-gray-500 dark:text-gray-400">Online</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Chat Messages -->
+                        <div id="chat-messages" class="flex-1 overflow-y-auto max-h-96 mb-4 space-y-2 bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div class="chat-message chat-bot">
+                                <p class="text-gray-900 dark:text-gray-100">👋 Hi! I'm SRE GPT. Ask me anything about your application health, services, infrastructure, or any issues you're experiencing.</p>
+                            </div>
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="mb-4">
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Quick actions:</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button class="quick-action bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200" 
+                                        data-message="Show overall system health">
+                                    📊 System Health
+                                </button>
+                                <button class="quick-action bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 px-3 py-1 rounded-full text-sm hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200" 
+                                        data-message="What problems are active?">
+                                    🚨 Active Problems
+                                </button>
+                                <button class="quick-action bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-3 py-1 rounded-full text-sm hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors duration-200" 
+                                        data-message="Which application is down?">
+                                    ⚠️ Down Apps
+                                </button>
+                                <button class="quick-action bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200" 
+                                        data-message="Show service performance">
+                                    🔧 Services
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Chat Input -->
+                        <div class="flex space-x-2">
+                            <input type="text" id="chat-input" 
+                                   placeholder="Ask about your application..." 
+                                   class="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
+                            <button id="send-btn" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50 transition-colors duration-200">
+                                📤 Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "sre-gpt-dashboard",
+  "builds": [
+    {
+      "src": "src/app.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "src/dashboard/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/dashboard/(.*)",
+      "dest": "/src/dashboard/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/src/app.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "src/app.js": {
+      "maxDuration": 30
+    }
+  }
+}

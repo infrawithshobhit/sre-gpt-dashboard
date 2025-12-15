@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Mode Test - Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9fafb;
+            color: #1f2937;
+            transition: all 0.3s ease;
+        }
+        
+        .dark body {
+            background-color: #111827 !important;
+            color: #f9fafb !important;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .dark .container {
+            background-color: #1f2937 !important;
+            color: #f9fafb !important;
+        }
+        
+        .toggle-btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .toggle-btn:hover {
+            background-color: #2563eb;
+        }
+        
+        .card {
+            background-color: #f3f4f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .dark .card {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-healthy {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .dark .status-healthy {
+            background-color: #064e3b !important;
+            color: #a7f3d0 !important;
+        }
+        
+        .status-critical {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .dark .status-critical {
+            background-color: #7f1d1d !important;
+            color: #fca5a5 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌙 Dark Mode Test</h1>
+        
+        <button class="toggle-btn" onclick="toggleTheme()">
+            <span id="theme-text">🌙 Enable Dark Mode</span>
+        </button>
+        
+        <div class="card">
+            <h3>Test Card</h3>
+            <p>This card should change colors when you toggle dark mode.</p>
+            <div>
+                <span class="status status-healthy">HEALTHY</span>
+                <span class="status status-critical">CRITICAL</span>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>Instructions</h3>
+            <ol>
+                <li>Click the toggle button above</li>
+                <li>Watch the page transition between light and dark themes</li>
+                <li>All colors should change smoothly</li>
+                <li>If this works, the main dashboard should work too</li>
+            </ol>
+        </div>
+        
+        <div id="status-message" style="margin-top: 20px; padding: 10px; border-radius: 6px; background-color: #e0f2fe; color: #0277bd;">
+            ✅ Ready to test! Click the button to toggle themes.
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const themeText = document.getElementById('theme-text');
+            const statusMessage = document.getElementById('status-message');
+            
+            if (isDark) {
+                document.documentElement.classList.remove('dark');
+                themeText.textContent = '🌙 Enable Dark Mode';
+                statusMessage.textContent = '☀️ Light mode active!';
+                statusMessage.style.backgroundColor = '#e0f2fe';
+                statusMessage.style.color = '#0277bd';
+                localStorage.setItem('test-theme', 'light');
+            } else {
+                document.documentElement.classList.add('dark');
+                themeText.textContent = '☀️ Enable Light Mode';
+                statusMessage.textContent = '🌙 Dark mode active!';
+                statusMessage.style.backgroundColor = '#1e3a8a';
+                statusMessage.style.color = '#dbeafe';
+                localStorage.setItem('test-theme', 'dark');
+            }
+        }
+        
+        // Initialize theme on load
+        window.addEventListener('load', function() {
+            const savedTheme = localStorage.getItem('test-theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-text').textContent = '☀️ Enable Light Mode';
+                const statusMessage = document.getElementById('status-message');
+                statusMessage.textContent = '🌙 Dark mode active!';
+                statusMessage.style.backgroundColor = '#1e3a8a';
+                statusMessage.style.color = '#dbeafe';
+            }
+        });
+    </script>
+</body>
+</html>
