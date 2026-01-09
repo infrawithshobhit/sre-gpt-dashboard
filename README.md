@@ -32,6 +32,7 @@ npm install
 ```bash
 # Copy environment template
 cp .env.example .env
+# Just Test
 
 # Edit with your Dynatrace credentials
 nano .env
@@ -307,3 +308,4 @@ MIT License - see LICENSE file for details
 ---
 
 **Built with ❤️ for SRE teams everywhere**
+ 

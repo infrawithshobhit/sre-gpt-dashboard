@@ -8,6 +8,7 @@
 2. **Name it**: `sre-gpt-dashboard` or `sre-gpt-monitoring`
 3. **Don't initialize** with README (we already have files)
 4. **Copy the repository URL** (e.g., `https://github.com/yourusername/sre-gpt-dashboard.git`)
+ echo "- Update on $(date)" >> daily-log.md
 
 ### Option 2: Initialize Local Repository First
 
