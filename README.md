@@ -2,6 +2,44 @@
 
 SRE GPT is an intelligent Site Reliability Engineering assistant that provides AI-powered application monitoring and analysis through Dynatrace integration. Get real-time insights, chat-based problem analysis, and proactive monitoring for your applications.
 
+
+# SRE GPT Dashboard
+
+An AI-powered incident intelligence system built on Dynatrace.
+
+This project helps SRE teams:
+• Understand incidents in plain English  
+• Correlate failures across services  
+• Decide what to fix first  
+• Reduce MTTR  
+
+---
+
+## Why this exists
+
+Monitoring tools tell you *what* broke.  
+This system explains *why* it broke and *what to do next*.
+
+---
+
+## Architecture
+
+Dynatrace → API → Node.js → GPT → SRE Dashboard
+
+Telemetry is pulled live from Dynatrace, enriched with context, and passed to GPT to generate human-readable incident analysis.
+
+---
+
+## Who this is for
+
+• SRE Teams  
+• Platform Engineers  
+• Incident Commanders  
+• Reliability Leads  
+• DevOps teams running production workloads
+
+
+
 ## 🚀 Features
 
 - **Real-time Monitoring**: Continuous health analysis of services, infrastructure, databases, and Kubernetes clusters
